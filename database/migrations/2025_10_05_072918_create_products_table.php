@@ -12,7 +12,7 @@ class CreateProductsTable extends Migration
             $table->id();
             $table->uuid('uuid');
             $table->string('name');
-            $table->integer('price');
+            $table->decimal('price', 10, 2);
             $table->text('description')->nullable();
             $table->string('stripe_product_id')->nullable();
             $table->string('stripe_price_id')->nullable();

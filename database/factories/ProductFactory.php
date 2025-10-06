@@ -24,7 +24,7 @@ class ProductFactory extends Factory
                 'Vanilla Essence', 'Vermicelli', 'Yellow Lentils', 'Besan Ladoo', 'Kesar Milk',
             ]),
             'description' => implode("\n", $faker->paragraphs(3)),
-            'price' => $faker->numberBetween(10, 100),
+            'price' => $faker->numberBetween(500, 5000),
         ];
     }
 }
