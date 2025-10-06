@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained()->onDelete('cascade');
             $table->integer('amount');
             $table->string('stripe_payment_id')->nullable();
-            $table->enum('status', ['pending','completed','failed'])->default('pending');
+            $table->enum('status', ['pending','completed','succeeded','failed','cancelled'])->default('pending');
             $table->timestamps();
         });
     }
