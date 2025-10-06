@@ -15,7 +15,7 @@ class ProductSeeder extends Seeder
 
         Stripe::setApiKey(env('STRIPE_SECRET'));
 
-        $products = Product::factory()->count(5)->create();
+        $products = Product::factory()->count(50)->create();
 
         foreach ($products as $product) {
 

@@ -27,20 +27,12 @@ class CheckoutController extends Controller
     {
         $product = Product::where('uuid', $uuid)->firstOrFail();
 
-        if (!Auth::check()) {
-            return redirect()->route('login')->with('info', 'Please login first.');
-        }
-
         return view('checkout.show', compact('product'));
     }
 
     public function success($uuid)
     {
         $checkout = Checkout::where('uuid', $uuid)->firstOrFail();
-
-        if (!Auth::check()) {
-            return redirect()->route('login')->with('info', 'Please login first.');
-        }
 
         return view('checkout.success', compact('checkout'));
     }
@@ -123,16 +115,19 @@ class CheckoutController extends Controller
     public function webhook(Request $request)
     {
         $payload = $request->getContent();
-        $sig_header = $request->header('Stripe-Signature');
-        $webhook_secret = config('services.stripe.webhook_secret');
+        //Log::error("Stripe Webhook payload:".json_encode($payload));
+        $signature_header = $request->header('Stripe-Signature');
 
-        if (!$sig_header) {
-            Log::error("Stripe Webhook: Signature header missing.");
+        $webhook_secret = env('STRIPE_WEBHOOK_SECRET');
+        //Log::error("Stripe Webhook: Signature header missing.");
+
+        if (!$signature_header) {
+            //Log::error("Stripe Webhook: Signature header missing.");
             return response()->json(['error' => 'Signature not found'], 400);
         }
 
         try {
-            $event = Webhook::constructEvent($payload, $sig_header, $webhook_secret);
+            $event = Webhook::constructEvent($payload, $signature_header, $webhook_secret);
         } catch (SignatureVerificationException $e) {
             Log::error("Stripe Webhook: Invalid signature - " . $e->getMessage());
             return response()->json(['error' => 'Invalid Signature'], 400);
@@ -140,7 +135,6 @@ class CheckoutController extends Controller
             Log::error("Stripe Webhook Error: " . $e->getMessage());
             return response()->json(['error' => 'Webhook error'], 400);
         }
-        Log::info("Stripe Webhook: Event received - ".$event->type);
 
         $paymentIntent = $event->data->object;
         $status = $paymentIntent->status;
