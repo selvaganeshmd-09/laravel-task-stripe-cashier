@@ -34,17 +34,12 @@ Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name
 // Show products grid
 Route::get('/', [ProductController::class, 'index'])->name('products.index');
 
-// Show single product page
-// Route::get('/product/{id}', [ProductController::class, 'show'])->name('products.show');
-
 // ------------------- Checkout -------------------
-// Show checkout page for a product
-Route::get('/checkout/{uuid}', [CheckoutController::class, 'show'])->name('checkout.show');
-
-// Process checkout (charge)
-Route::post('/checkout/{uuid}', [CheckoutController::class, 'process'])->name('checkout.process');
-Route::get('/checkout-success/{uuid}', [CheckoutController::class, 'success'])->name('checkout.success');
-Route::get('/checkout-failed', [CheckoutController::class, 'failed'])->name('checkout.failed');
-
+Route::middleware('auth')->group(function () {
+    Route::get('/checkout/{uuid}', [CheckoutController::class, 'show'])->name('checkout.show');
+    Route::post('/checkout/{uuid}', [CheckoutController::class, 'process'])->name('checkout.process');
+    Route::get('/checkout-success/{uuid}', [CheckoutController::class, 'success'])->name('checkout.success');
+    Route::get('/checkout-failed', [CheckoutController::class, 'failed'])->name('checkout.failed');
+});
 // ------------------- Stripe Webhook -------------------
 Route::post('/stripe/webhook', [CheckoutController::class, 'webhook'])->name('stripe.webhook');

@@ -29,7 +29,6 @@
         });
         card.mount('#card-element');
 
-        // ✅ Use a unique variable name to avoid submit() conflict
         const paymentForm = document.getElementById('payment-form');
 
         paymentForm.addEventListener('submit', async (e) => {

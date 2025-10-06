@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Stripe\Webhook;
+use Stripe\Exception\SignatureVerificationException;
 use App\Models\Product;
 use App\Models\Checkout;
 use Auth;
@@ -91,7 +94,6 @@ class CheckoutController extends Controller
                 'stripe_price_id' => $product->stripe_price_id,
                 'stripe_payment_id' => $charge->id,
                 'amount' => $product->price,
-                'status' => 'completed',
                 'billing_name' => $request->name,
                 'billing_email' => $request->email,
                 'billing_phone' => $request->phone,
@@ -110,7 +112,6 @@ class CheckoutController extends Controller
                 'user_id' => $user->id,
                 'product_id' => $product->id,
                 'amount' => $product->price,
-                'status' => 'failed',
                 'stripe_response' => json_encode($e->getMessage()),
             ]);
 
@@ -121,38 +122,57 @@ class CheckoutController extends Controller
 
     public function webhook(Request $request)
     {
-        $endpoint_secret = env('STRIPE_WEBHOOK_SECRET');
         $payload = $request->getContent();
         $sig_header = $request->header('Stripe-Signature');
+        $webhook_secret = config('services.stripe.webhook_secret');
 
-        try {
-            $event = \Stripe\Webhook::constructEvent($payload, $sig_header, $endpoint_secret);
-        } catch (\Stripe\Exception\SignatureVerificationException $e) {
-            return response('Invalid signature', 400);
+        if (!$sig_header) {
+            Log::error("Stripe Webhook: Signature header missing.");
+            return response()->json(['error' => 'Signature not found'], 400);
         }
 
-        $object = $event->data->object;
+        try {
+            $event = Webhook::constructEvent($payload, $sig_header, $webhook_secret);
+        } catch (SignatureVerificationException $e) {
+            Log::error("Stripe Webhook: Invalid signature - " . $e->getMessage());
+            return response()->json(['error' => 'Invalid Signature'], 400);
+        } catch (\Exception $e) {
+            Log::error("Stripe Webhook Error: " . $e->getMessage());
+            return response()->json(['error' => 'Webhook error'], 400);
+        }
+        Log::info("Stripe Webhook: Event received - ".$event->type);
+
+        $paymentIntent = $event->data->object;
+        $status = $paymentIntent->status;
 
         switch ($event->type) {
             case 'payment_intent.succeeded':
-                $checkout = Checkout::where('stripe_payment_id', $object->id)->first();
-                if ($checkout) {
-                    $checkout->update(['status' => 'success']);
-                }
+                $this->updatePaymentStatus($paymentIntent->id, 'succeeded');
                 break;
 
             case 'payment_intent.payment_failed':
-                $checkout = Checkout::where('stripe_payment_id', $object->id)->first();
-                if ($checkout) {
-                    $checkout->update([
-                        'status' => 'failed',
-                        'error_message' => $object->last_payment_error->message ?? 'Unknown error'
-                    ]);
-                }
+                $this->updatePaymentStatus($paymentIntent->id, 'failed');
                 break;
+
+            case 'payment_intent.canceled':
+                $this->updatePaymentStatus($paymentIntent->id, 'canceled');
+                break;
+
+            default:
         }
 
-        return response()->json(['received' => true]);
+        return response()->json(['message' => 'Webhook received']);
     }
 
+
+    private function updatePaymentStatus($stripePaymentId, $status)
+    {
+        $payment = Checkout::where('stripe_payment_id', $stripePaymentId)->first();
+
+        if ($payment) {
+            $payment->update(['status' => $status]);
+        } else {
+            Log::warning("Stripe Webhook Warning: Payment not found for ID - " . $stripePaymentId);
+        }
+    }
 }
